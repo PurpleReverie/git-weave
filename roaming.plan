@@ -1,0 +1,12 @@
+
+commands
+
+    init 
+        scan sub folders .weave-child files
+        update git exclude with folders to ignore
+        update git hooks to pull when pull is initiated
+
+    sync
+        force all sub repos to pull
+
+I need a wrapper that makes it easy to run the command line
