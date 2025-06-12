@@ -1,0 +1,18 @@
+
+scan folders
+    parsing config .weave-child files in subfolders
+
+update git repo
+    scripts are added to git to exclude the repo folders
+
+update git repo
+    scripts are added to the git repo to pull child repos on pull
+
+...
+
+final version
+    init scans sub folders, 
+    update git with exclude folders 
+    and git pre hooks
+
+    sync will pull repos if it can
