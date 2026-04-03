@@ -2,6 +2,7 @@ export interface ThreadFile {
   repo: string;
   branch: string;
   hash?: string | null;
+  alias?: string;
 }
 
 export interface WeaveConfig {

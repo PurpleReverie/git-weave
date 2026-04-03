@@ -34,9 +34,14 @@ export async function parseThread(filePath: string): Promise<ThreadFile> {
     throw new Error(`Field "hash" must be a string or null in: ${filePath}`);
   }
 
+  if (obj.alias !== undefined && typeof obj.alias !== 'string') {
+    throw new Error(`Field "alias" must be a string in: ${filePath}`);
+  }
+
   return {
     repo: obj.repo,
     branch: obj.branch,
     hash: obj.hash as string | null | undefined,
+    alias: obj.alias as string | undefined,
   };
 }

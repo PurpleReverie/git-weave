@@ -52,9 +52,10 @@ my-project/
 
 | Field | Required | Description |
 |---|---|---|
-| `repo` | Yes | Canonical remote URL |
+| `repo` | Yes | Canonical remote URL — this is what gets committed |
 | `branch` | Yes | Branch to track |
 | `hash` | No | Pinned commit hash. Omit to track latest on `branch` |
+| `alias` | No | Env var name that, if set locally, overrides the `repo` URL for that machine |
 
 ## `weave.json` config
 
@@ -135,12 +136,26 @@ When you need to make changes inside a child repo:
 
 ## Local machine setup
 
-If you need to override a repo URL locally (e.g. SSH config alias), use git's URL rewrite — no changes to `.thread` files needed:
+Two complementary mechanisms handle SSH alias differences between machines.
+
+**Host-level rewrite** — good when all repos from a given host use the same SSH alias:
 
 ```bash
 # Repo-local (writes to .git/config)
 git config url."git@github-personal:".insteadOf "git@github.com:"
 
-# Or globally on the machine
+# Or globally
 git config --global url."git@github-personal:".insteadOf "git@github.com:"
 ```
+
+**Per-repo override via `alias`** — needed when different repos require different SSH aliases on the same machine. Set the `alias` field in the `.thread` file, then define the env var locally:
+
+```json
+{ "repo": "git@github.com:org/repo.git", "branch": "main", "alias": "MY_REPO" }
+```
+
+```bash
+export MY_REPO=git@github-personal:org/repo.git
+```
+
+If the env var is set, weave uses it instead of `repo`. If not, falls back to `repo`.
