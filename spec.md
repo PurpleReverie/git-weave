@@ -117,25 +117,40 @@ JSON file that declares a child repository dependency.
 {
   "repo": "git@github.com:org/repo.git",
   "branch": "main",
-  "hash": "abc1234"
+  "hash": "abc1234",
+  "alias": "MY_REPO"
 }
 ```
 
 | Field | Required | Description |
 |---|---|---|
-| `repo` | Yes | Canonical remote URL of the child repo — this is what gets committed |
+| `repo` | Yes | Canonical remote URL — this is what gets committed |
 | `branch` | Yes | Branch to track |
 | `hash` | No | Pinned commit hash. If absent/null, pulls latest on `branch` |
+| `alias` | No | Env var name that, if set on the local machine, overrides the `repo` URL entirely |
 
-### Local URL overriding (SSH aliases)
+### Local URL overriding
 
-If a machine uses an SSH config alias instead of the canonical host in `repo` (e.g. `github-personal` instead of `github.com`), use git's built-in URL rewrite rather than modifying the `.thread` file:
+Two complementary mechanisms handle SSH alias differences between machines:
+
+**`git config url.insteadOf`** — host-level rewrite, good when all repos from a given host use the same SSH alias:
 
 ```bash
 git config url."git@github-personal:".insteadOf "git@github.com:"
 ```
 
-This keeps `.thread` files portable and committed as-is. The rewrite lives in `.git/config` (repo-local) or `~/.gitconfig` (global). See the Package Distribution section for more detail.
+**`alias` field** — per-repo override via env var, needed when different repos require different SSH aliases on the same machine:
+
+```json
+{ "repo": "git@github.com:org/repo.git", "alias": "MY_REPO" }
+```
+
+```bash
+# Local machine env var
+MY_REPO=git@github-personal:org/repo.git
+```
+
+If the env var is set, weave uses its value instead of `repo`. If not set, falls back to `repo`. No credentials are stored in the `.thread` file.
 
 ---
 
