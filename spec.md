@@ -16,6 +16,89 @@
 
 ---
 
+## Package Distribution
+
+### Installing from a GitHub repo (private use)
+
+npm supports installing directly from a GitHub repository without publishing to any registry:
+
+```bash
+npm install -g github:taurajgreig/dotnet-weave
+```
+
+Or pinned to a tag or commit:
+
+```bash
+npm install -g github:taurajgreig/dotnet-weave#v0.1.0
+```
+
+Referenced in another project's `package.json`:
+
+```json
+{
+  "dependencies": {
+    "weave": "github:taurajgreig/dotnet-weave"
+  }
+}
+```
+
+Access to private repos is handled via existing SSH or GitHub auth on the machine — no extra config needed.
+
+### SSH alias rewriting (awareness only — not yet implemented)
+
+If a machine uses an SSH config alias instead of `github.com` directly (e.g. for multi-account setups), git can transparently rewrite URLs without changing `package.json`:
+
+```bash
+# Apply only to this repo (writes to .git/config)
+git config url."git@mygithub:".insteadOf "git@github.com:"
+
+# Or globally on the machine
+git config --global url."git@mygithub:".insteadOf "git@github.com:"
+```
+
+`package.json` always holds the canonical `github:taurajgreig/...` address. The rewrite rule lives on the machine, not in the repo. This is not automated yet — it is a manual step when setting up on a new machine with a non-standard SSH config.
+
+---
+
+## Package Folder Structure
+
+The minimum structure required for the repo to function as an installable npm package:
+
+```
+weave/
+├── src/
+│   └── index.ts        # Entry point — must have #!/usr/bin/env node shebang
+├── dist/               # Compiled output — gitignored, built automatically on install via prepare script
+│   └── index.js
+├── package.json        # See required fields below
+├── tsconfig.json
+└── .gitignore
+```
+
+### Required `package.json` fields
+
+| Field | Value | Purpose |
+|---|---|---|
+| `"name"` | `"weave"` | Package identity |
+| `"version"` | `"0.1.0"` | Version |
+| `"main"` | `"dist/index.js"` | Entry point for require/import |
+| `"bin"` | `{ "weave": "dist/index.js" }` | Registers the `weave` CLI command on install |
+| `"type"` | `"module"` | ESM module mode |
+| `"prepare"` | `"npm run build"` | Runs `tsc` automatically when installed from a git URL — ensures `dist/` is built on the consuming machine |
+| `"files"` | `["dist"]` | Controls what is included when publishing to a registry (less critical for git installs) |
+
+### Shebang requirement
+
+The compiled `dist/index.js` must begin with:
+
+```
+#!/usr/bin/env node
+```
+
+This is set in `src/index.ts` and carried through by the TypeScript compiler. Without it, the installed binary won't be executable directly as a CLI command.
+
+---
+
 ## File Conventions
 
 | File | Purpose |

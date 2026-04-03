@@ -43,3 +43,4 @@ packages/
 node_modules/
 dist/
 weave.local.json
+.testbed/

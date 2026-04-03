@@ -43,4 +43,11 @@ program
     console.log('ignore invoked');
   });
 
+program
+  .command('hello')
+  .description('Hello world test command')
+  .action(() => {
+    console.log('Hello from weave!');
+  });
+
 program.parse();
