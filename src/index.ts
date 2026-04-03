@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import { parseWeaveConfig } from './config/parseWeaveConfig.js';
+import { scanThreadFiles } from './config/scanThreadFiles.js';
+import { syncRepo } from './sync/syncRepo.js';
 
 const program = new Command();
 
@@ -18,8 +21,26 @@ program
 program
   .command('sync')
   .description('Sync all child repos declared in .thread files')
-  .action(() => {
-    console.log('sync invoked');
+  .action(async () => {
+    const cwd = process.cwd();
+    const config = await parseWeaveConfig(cwd);
+    const threads = await scanThreadFiles(cwd, config);
+
+    if (threads.length === 0) {
+      console.log('No .thread files found.');
+      return;
+    }
+
+    for (const resolved of threads) {
+      process.stdout.write(`  ${resolved.thread.repo} ... `);
+      const result = await syncRepo(resolved);
+
+      if (result.status === 'failed') {
+        console.log(`failed\n    ${result.error}`);
+      } else {
+        console.log(result.status);
+      }
+    }
   });
 
 program
@@ -48,6 +69,28 @@ program
   .description('Hello world test command')
   .action(() => {
     console.log('Hello from weave!');
+  });
+
+program
+  .command('debug')
+  .description('Print parsed config and discovered .thread files')
+  .action(async () => {
+    const cwd = process.cwd();
+    const config = await parseWeaveConfig(cwd);
+    const threads = await scanThreadFiles(cwd, config);
+
+    console.log('\n--- weave.json ---');
+    console.log(JSON.stringify(config, null, 2));
+
+    console.log('\n--- .thread files ---');
+    if (threads.length === 0) {
+      console.log('No .thread files found.');
+    } else {
+      for (const t of threads) {
+        console.log(`\n${t.filePath}`);
+        console.log(JSON.stringify(t.thread, null, 2));
+      }
+    }
   });
 
 program.parse();
