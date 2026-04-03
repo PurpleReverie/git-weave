@@ -2,7 +2,6 @@ import { access } from 'fs/promises';
 import { join, basename } from 'path';
 import { simpleGit } from 'simple-git';
 import { ResolvedThread } from '../types.js';
-import { resolveRepoUrl } from './resolveAuth.js';
 
 export type SyncStatus = 'cloned' | 'updated' | 'failed';
 
@@ -31,7 +30,7 @@ async function dirExists(path: string): Promise<boolean> {
 export async function syncRepo(resolved: ResolvedThread): Promise<SyncResult> {
   const { filePath, thread } = resolved;
   const targetDir = targetDirForThread(filePath);
-  const repoUrl = resolveRepoUrl(thread.repo, thread.alias);
+  const repoUrl = thread.repo;
 
   try {
     if (!await dirExists(targetDir)) {

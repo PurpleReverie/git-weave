@@ -117,17 +117,25 @@ JSON file that declares a child repository dependency.
 {
   "repo": "git@github.com:org/repo.git",
   "branch": "main",
-  "hash": "abc1234",
-  "alias": "MY_REPO"
+  "hash": "abc1234"
 }
 ```
 
 | Field | Required | Description |
 |---|---|---|
-| `repo` | Yes | Remote URL of the child repo |
+| `repo` | Yes | Canonical remote URL of the child repo — this is what gets committed |
 | `branch` | Yes | Branch to track |
 | `hash` | No | Pinned commit hash. If absent/null, pulls latest on `branch` |
-| `alias` | No | Maps to an env var (e.g. `MY_REPO_TOKEN`) for private repo auth. No credentials stored in the file |
+
+### Local URL overriding (SSH aliases)
+
+If a machine uses an SSH config alias instead of the canonical host in `repo` (e.g. `github-personal` instead of `github.com`), use git's built-in URL rewrite rather than modifying the `.thread` file:
+
+```bash
+git config url."git@github-personal:".insteadOf "git@github.com:"
+```
+
+This keeps `.thread` files portable and committed as-is. The rewrite lives in `.git/config` (repo-local) or `~/.gitconfig` (global). See the Package Distribution section for more detail.
 
 ---
 
