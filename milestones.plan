@@ -1,18 +1,79 @@
+# Weave — Milestones
 
-scan folders
-    parsing config .weave-child files in subfolders
+Each milestone targets working, usable functionality. Later milestones build on earlier ones.
 
-update git repo
-    scripts are added to git to exclude the repo folders
+---
 
-update git repo
-    scripts are added to the git repo to pull child repos on pull
+## M1 — Foundation: Config Parsing
 
-...
+Goal: the tool can read and validate its own config files. No git operations yet.
 
-final version
-    init scans sub folders, 
-    update git with exclude folders 
-    and git pre hooks
+- Parse `.thread` files (repo, branch, hash, alias fields)
+- Parse `weave.json` root config (version, scan paths, syncStrategy, hooks, exclude)
+- Validate both formats and surface clear errors on bad input
+- Resolve scan paths relative to cwd
 
-    sync will pull repos if it can
+Outcome: internal config model ready for all subsequent commands to use.
+
+---
+
+## M2 — Git Exclude Management
+
+Goal: `weave init` and `weave ignore` are functional. First real user-facing value.
+
+- `weave init`: scan for `.thread` files, add each child directory to `.git/info/exclude`
+- `weave ignore`: refresh `.git/info/exclude` — add new entries, remove stale ones
+- Respect `exclude` field in `weave.json` (`"git-info"` vs `"gitignore"`)
+- Handle case where `.git/info/exclude` doesn't exist yet
+
+Outcome: running `weave init` on a repo with `.thread` files correctly excludes child dirs from git.
+
+---
+
+## M3 — Repo Syncing
+
+Goal: `weave sync` clones and checks out child repos. The tool now does its core job.
+
+- Clone child repos that don't exist locally yet
+- Checkout pinned `hash` if present, otherwise pull latest on `branch`
+- Resolve auth via `alias` → env var mapping for private repos
+- Report per-repo status (cloned / updated / skipped / failed)
+
+Outcome: `weave sync` (and the sync step inside `weave init`) pull child repos to the correct state.
+
+---
+
+## M4 — Safety and Locking
+
+Goal: protect in-progress work in child repos and support reproducible pinning.
+
+- Dirty state detection in `weave sync`: skip + warn if child has uncommitted changes, unpushed commits, or HEAD ahead of pinned hash
+- `weave lock`: walk all `.thread` files, write current HEAD hash into each
+- `weave unlock [path]`: clear `hash` from a `.thread` file (or all if no path given)
+
+Outcome: developers can safely work in child repos without sync clobbering their changes, and can pin/unpin repo versions explicitly.
+
+---
+
+## M5 — Git Hook Automation
+
+Goal: sync triggers automatically on git pull/checkout without the user thinking about it.
+
+- `weave init` installs `post-merge` and `post-checkout` hooks into `.git/hooks/`
+- Hooks call `weave sync` when triggered
+- Respect `hooks.postMerge` and `hooks.postCheckout` flags in `weave.json`
+- Handle the case where hooks already exist (append, don't overwrite)
+
+Outcome: checking out a branch or pulling automatically keeps child repos in sync.
+
+---
+
+## M6 — Local Overrides
+
+Goal: per-developer control over which child repos weave manages, without affecting shared config.
+
+- Parse `weave.local.json` (gitignored by default)
+- `"managed": false` on an override causes `weave sync` to skip that child entirely
+- `weave init` ensures `weave.local.json` is present in `.git/info/exclude` or `.gitignore`
+
+Outcome: developers can opt out of weave managing specific child repos locally, useful during extended development on a child.
