@@ -17,9 +17,22 @@ Outcome: internal config model ready for all subsequent commands to use.
 
 ---
 
-## M2 — Git Exclude Management
+## M2 — Repo Syncing
 
-Goal: `weave init` and `weave ignore` are functional. First real user-facing value.
+Goal: `weave sync` clones and checks out child repos. The tool does its core job, testable independently of any git config on the parent repo.
+
+- Clone child repos that don't exist locally yet
+- Checkout pinned `hash` if present, otherwise pull latest on `branch`
+- Resolve auth via `alias` → env var mapping for private repos
+- Report per-repo status (cloned / updated / skipped / failed)
+
+Outcome: `weave sync` pulls child repos to the correct state.
+
+---
+
+## M3 — Git Exclude Management
+
+Goal: `weave init` and `weave ignore` are functional. Parent repo becomes aware of child dirs.
 
 - `weave init`: scan for `.thread` files, add each child directory to `.git/info/exclude`
 - `weave ignore`: refresh `.git/info/exclude` — add new entries, remove stale ones
@@ -27,19 +40,6 @@ Goal: `weave init` and `weave ignore` are functional. First real user-facing val
 - Handle case where `.git/info/exclude` doesn't exist yet
 
 Outcome: running `weave init` on a repo with `.thread` files correctly excludes child dirs from git.
-
----
-
-## M3 — Repo Syncing
-
-Goal: `weave sync` clones and checks out child repos. The tool now does its core job.
-
-- Clone child repos that don't exist locally yet
-- Checkout pinned `hash` if present, otherwise pull latest on `branch`
-- Resolve auth via `alias` → env var mapping for private repos
-- Report per-repo status (cloned / updated / skipped / failed)
-
-Outcome: `weave sync` (and the sync step inside `weave init`) pull child repos to the correct state.
 
 ---
 
