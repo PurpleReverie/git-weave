@@ -39,3 +39,7 @@ packages/
 *.pidb
 *.userprefs
 *.userprefs.meta
+
+node_modules/
+dist/
+weave.local.json
