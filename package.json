@@ -10,7 +10,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "ts-node src/index.ts",
-    "prepublishOnly": "npm run build"
+    "prepare": "npm run build"
   },
   "files": [
     "dist"
