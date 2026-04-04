@@ -3,6 +3,8 @@ import { Command } from 'commander';
 import { parseWeaveConfig } from './config/parseWeaveConfig.js';
 import { scanThreadFiles } from './config/scanThreadFiles.js';
 import { syncRepo } from './sync/syncRepo.js';
+import { assertGitRepo } from './git/assertGitRepo.js';
+import { updateExclude } from './git/updateExclude.js';
 
 const program = new Command();
 
@@ -13,9 +15,31 @@ program
 
 program
   .command('init')
-  .description('Scan for .thread files, update git exclude, and install git hooks')
-  .action(() => {
-    console.log('init invoked');
+  .description('Scan for .thread files, update git exclude, and sync child repos')
+  .action(async () => {
+    const cwd = process.cwd();
+    const gitRoot = await assertGitRepo(cwd);
+    const config = await parseWeaveConfig(cwd);
+    const threads = await scanThreadFiles(cwd, config);
+
+    if (threads.length === 0) {
+      console.log('No .thread files found.');
+      return;
+    }
+
+    await updateExclude(gitRoot, threads, config);
+    console.log(`Updated exclude file with ${threads.length} entr${threads.length === 1 ? 'y' : 'ies'}.`);
+
+    console.log('Syncing child repos...');
+    for (const resolved of threads) {
+      process.stdout.write(`  ${resolved.thread.repo} ... `);
+      const result = await syncRepo(resolved);
+      if (result.status === 'failed') {
+        console.log(`failed\n    ${result.error}`);
+      } else {
+        console.log(result.status);
+      }
+    }
   });
 
 program
@@ -60,8 +84,14 @@ program
 program
   .command('ignore')
   .description('Refresh .git/info/exclude entries based on current .thread files')
-  .action(() => {
-    console.log('ignore invoked');
+  .action(async () => {
+    const cwd = process.cwd();
+    const gitRoot = await assertGitRepo(cwd);
+    const config = await parseWeaveConfig(cwd);
+    const threads = await scanThreadFiles(cwd, config);
+
+    await updateExclude(gitRoot, threads, config);
+    console.log(`Updated exclude file with ${threads.length} entr${threads.length === 1 ? 'y' : 'ies'}.`);
   });
 
 program
