@@ -12,6 +12,7 @@ export interface WeaveConfig {
   hooks: {
     postMerge: boolean;
     postCheckout: boolean;
+    prePush: boolean;
   };
   exclude: 'git-info' | 'gitignore';
 }

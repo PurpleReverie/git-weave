@@ -11,6 +11,7 @@ import { updateExclude } from './git/updateExclude.js';
 import { lockThread } from './sync/lockThreads.js';
 import { unlockThread } from './sync/unlockThreads.js';
 import { installHooks } from './git/installHooks.js';
+import { checkRepos } from './sync/checkRepos.js';
 
 const program = new Command();
 
@@ -126,6 +127,36 @@ program
     for (const resolved of targets) {
       await unlockThread(resolved);
       console.log(`  ${resolved.filePath} ... unlocked`);
+    }
+  });
+
+program
+  .command('check')
+  .description('Verify all child repos are clean and at the correct hash/branch')
+  .action(async () => {
+    const cwd = process.cwd();
+    const config = await parseWeaveConfig(cwd);
+    const threads = await scanThreadFiles(cwd, config);
+
+    if (threads.length === 0) {
+      console.log('No .thread files found.');
+      return;
+    }
+
+    const results = await checkRepos(threads);
+    let failed = false;
+
+    for (const result of results) {
+      if (result.status === 'ok') {
+        console.log(`  ${result.filePath} ... ok`);
+      } else {
+        console.log(`  ${result.filePath} ... ${result.status}\n    ${result.detail}`);
+        failed = true;
+      }
+    }
+
+    if (failed) {
+      process.exit(1);
     }
   });
 
