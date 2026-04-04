@@ -45,7 +45,7 @@ export async function syncRepo(resolved: ResolvedThread): Promise<SyncResult> {
       return { filePath, targetDir, status: 'cloned' };
     }
 
-    const dirty = await checkDirtyState(targetDir, thread.hash);
+    const dirty = await checkDirtyState(targetDir);
     if (!dirty.clean) {
       return { filePath, targetDir, status: 'skipped', error: dirty.reason };
     }
