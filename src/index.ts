@@ -1,5 +1,8 @@
 #!/usr/bin/env node
+import { config as loadEnv } from 'dotenv';
 import { Command } from 'commander';
+
+loadEnv({ quiet: true }); // load .env from cwd; shell env takes priority (override: false is the default)
 import { parseWeaveConfig } from './config/parseWeaveConfig.js';
 import { scanThreadFiles } from './config/scanThreadFiles.js';
 import { syncRepo } from './sync/syncRepo.js';
