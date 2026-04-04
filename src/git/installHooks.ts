@@ -7,6 +7,7 @@ const WEAVE_MARKER = '# managed by weave';
 const HOOK_LINE: Record<string, string> = {
   'post-merge': `weave sync  ${WEAVE_MARKER}`,
   'post-checkout': `weave sync  ${WEAVE_MARKER}`,
+  'pre-push': `weave check  ${WEAVE_MARKER}`,
 };
 
 async function readFileOrNull(path: string): Promise<string | null> {
@@ -46,5 +47,9 @@ export async function installHooks(gitRoot: string, config: WeaveConfig): Promis
 
   if (config.hooks.postCheckout) {
     await installHook(hooksDir, 'post-checkout');
+  }
+
+  if (config.hooks.prePush) {
+    await installHook(hooksDir, 'pre-push');
   }
 }

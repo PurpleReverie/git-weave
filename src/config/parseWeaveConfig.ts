@@ -9,6 +9,7 @@ const DEFAULTS: WeaveConfig = {
   hooks: {
     postMerge: true,
     postCheckout: true,
+    prePush: true,
   },
   exclude: 'git-info',
 };
@@ -60,6 +61,7 @@ export async function parseWeaveConfig(cwd: string): Promise<WeaveConfig> {
     hooks: {
       postMerge: typeof hooks.postMerge === 'boolean' ? hooks.postMerge : DEFAULTS.hooks.postMerge,
       postCheckout: typeof hooks.postCheckout === 'boolean' ? hooks.postCheckout : DEFAULTS.hooks.postCheckout,
+      prePush: typeof hooks.prePush === 'boolean' ? hooks.prePush : DEFAULTS.hooks.prePush,
     },
     exclude: (obj.exclude as WeaveConfig['exclude']) ?? DEFAULTS.exclude,
   };

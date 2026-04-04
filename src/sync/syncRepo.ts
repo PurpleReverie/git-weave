@@ -4,6 +4,8 @@ import { simpleGit } from 'simple-git';
 import { ResolvedThread } from '../types.js';
 import { resolveRepoUrl } from './resolveAuth.js';
 import { checkDirtyState } from '../git/checkDirtyState.js';
+import { parseWeaveConfig } from '../config/parseWeaveConfig.js';
+import { scanThreadFiles } from '../config/scanThreadFiles.js';
 
 export type SyncStatus = 'cloned' | 'updated' | 'skipped' | 'failed';
 
@@ -13,6 +15,8 @@ export interface SyncResult {
   status: SyncStatus;
   error?: string;
 }
+
+const MAX_DEPTH = 3;
 
 function targetDirForThread(filePath: string): string {
   const dir = filePath.substring(0, filePath.lastIndexOf('/'));
@@ -29,7 +33,32 @@ async function dirExists(path: string): Promise<boolean> {
   }
 }
 
-export async function syncRepo(resolved: ResolvedThread): Promise<SyncResult> {
+async function syncNestedThreads(targetDir: string, depth: number): Promise<void> {
+  if (depth >= MAX_DEPTH) return;
+
+  let nestedThreads;
+  try {
+    const nestedConfig = await parseWeaveConfig(targetDir);
+    nestedThreads = await scanThreadFiles(targetDir, nestedConfig);
+  } catch {
+    return; // no .thread files or unreadable — skip silently
+  }
+
+  if (nestedThreads.length === 0) return;
+
+  const indent = '  '.repeat(depth + 1);
+  for (const nested of nestedThreads) {
+    process.stdout.write(`${indent}${nested.thread.repo} ... `);
+    const result = await syncRepo(nested, depth + 1);
+    if (result.status === 'failed' || result.status === 'skipped') {
+      console.log(`${result.status}\n${indent}  ${result.error}`);
+    } else {
+      console.log(result.status);
+    }
+  }
+}
+
+export async function syncRepo(resolved: ResolvedThread, depth = 0): Promise<SyncResult> {
   const { filePath, thread } = resolved;
   const targetDir = targetDirForThread(filePath);
   const repoUrl = resolveRepoUrl(thread.repo, thread.alias);
@@ -42,6 +71,7 @@ export async function syncRepo(resolved: ResolvedThread): Promise<SyncResult> {
         await simpleGit(targetDir).checkout(thread.hash);
       }
 
+      await syncNestedThreads(targetDir, depth);
       return { filePath, targetDir, status: 'cloned' };
     }
 
@@ -60,6 +90,7 @@ export async function syncRepo(resolved: ResolvedThread): Promise<SyncResult> {
       await git.pull();
     }
 
+    await syncNestedThreads(targetDir, depth);
     return { filePath, targetDir, status: 'updated' };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
