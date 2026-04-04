@@ -5,6 +5,8 @@ import { scanThreadFiles } from './config/scanThreadFiles.js';
 import { syncRepo } from './sync/syncRepo.js';
 import { assertGitRepo } from './git/assertGitRepo.js';
 import { updateExclude } from './git/updateExclude.js';
+import { lockThread } from './sync/lockThreads.js';
+import { unlockThread } from './sync/unlockThreads.js';
 
 const program = new Command();
 
@@ -34,8 +36,8 @@ program
     for (const resolved of threads) {
       process.stdout.write(`  ${resolved.thread.repo} ... `);
       const result = await syncRepo(resolved);
-      if (result.status === 'failed') {
-        console.log(`failed\n    ${result.error}`);
+      if (result.status === 'failed' || result.status === 'skipped') {
+        console.log(`${result.status}\n    ${result.error}`);
       } else {
         console.log(result.status);
       }
@@ -59,8 +61,8 @@ program
       process.stdout.write(`  ${resolved.thread.repo} ... `);
       const result = await syncRepo(resolved);
 
-      if (result.status === 'failed') {
-        console.log(`failed\n    ${result.error}`);
+      if (result.status === 'failed' || result.status === 'skipped') {
+        console.log(`${result.status}\n    ${result.error}`);
       } else {
         console.log(result.status);
       }
@@ -70,15 +72,54 @@ program
 program
   .command('lock')
   .description('Pin all child repos to their current HEAD hash')
-  .action(() => {
-    console.log('lock invoked');
+  .action(async () => {
+    const cwd = process.cwd();
+    const config = await parseWeaveConfig(cwd);
+    const threads = await scanThreadFiles(cwd, config);
+
+    if (threads.length === 0) {
+      console.log('No .thread files found.');
+      return;
+    }
+
+    for (const resolved of threads) {
+      process.stdout.write(`  ${resolved.filePath} ... `);
+      try {
+        const hash = await lockThread(resolved);
+        console.log(hash.slice(0, 7));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.log(`failed\n    ${message}`);
+      }
+    }
   });
 
 program
   .command('unlock [path]')
   .description('Clear the pinned hash for a child repo, returning it to latest-tracking')
-  .action((path) => {
-    console.log('unlock invoked', path ?? '(all)');
+  .action(async (path?: string) => {
+    const cwd = process.cwd();
+    const config = await parseWeaveConfig(cwd);
+    const threads = await scanThreadFiles(cwd, config);
+
+    if (threads.length === 0) {
+      console.log('No .thread files found.');
+      return;
+    }
+
+    const targets = path
+      ? threads.filter(t => t.filePath.includes(path))
+      : threads;
+
+    if (targets.length === 0) {
+      console.log(`No .thread files matched: ${path}`);
+      return;
+    }
+
+    for (const resolved of targets) {
+      await unlockThread(resolved);
+      console.log(`  ${resolved.filePath} ... unlocked`);
+    }
   });
 
 program
