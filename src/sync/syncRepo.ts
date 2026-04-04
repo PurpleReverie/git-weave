@@ -3,8 +3,9 @@ import { join, basename } from 'path';
 import { simpleGit } from 'simple-git';
 import { ResolvedThread } from '../types.js';
 import { resolveRepoUrl } from './resolveAuth.js';
+import { checkDirtyState } from '../git/checkDirtyState.js';
 
-export type SyncStatus = 'cloned' | 'updated' | 'failed';
+export type SyncStatus = 'cloned' | 'updated' | 'skipped' | 'failed';
 
 export interface SyncResult {
   filePath: string;
@@ -42,6 +43,11 @@ export async function syncRepo(resolved: ResolvedThread): Promise<SyncResult> {
       }
 
       return { filePath, targetDir, status: 'cloned' };
+    }
+
+    const dirty = await checkDirtyState(targetDir, thread.hash);
+    if (!dirty.clean) {
+      return { filePath, targetDir, status: 'skipped', error: dirty.reason };
     }
 
     const git = simpleGit(targetDir);
