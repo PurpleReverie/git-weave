@@ -7,6 +7,7 @@ import { assertGitRepo } from './git/assertGitRepo.js';
 import { updateExclude } from './git/updateExclude.js';
 import { lockThread } from './sync/lockThreads.js';
 import { unlockThread } from './sync/unlockThreads.js';
+import { installHooks } from './git/installHooks.js';
 
 const program = new Command();
 
@@ -31,6 +32,9 @@ program
 
     await updateExclude(gitRoot, threads, config);
     console.log(`Updated exclude file with ${threads.length} entr${threads.length === 1 ? 'y' : 'ies'}.`);
+
+    await installHooks(gitRoot, config);
+    console.log('Installed git hooks.');
 
     console.log('Syncing child repos...');
     for (const resolved of threads) {
