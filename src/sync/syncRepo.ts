@@ -79,6 +79,8 @@ export async function syncRepo(resolved: ResolvedThread, depth = 0, rootEnvPath 
         }
         await syncNestedThreads(targetDir, depth, rootEnvPath);
       } catch (err) {
+        // Clean up the partially-initialised directory so the next sync
+        // retries a full clone rather than stumbling over corrupt state.
         await rm(targetDir, { recursive: true, force: true });
         throw err;
       }

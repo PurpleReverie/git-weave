@@ -17,6 +17,8 @@ function buildBlock(entries: string[]): string {
   return [BLOCK_START, ...entries, BLOCK_END].join('\n') + '\n';
 }
 
+// Removes the weave-managed block from existing file content while leaving
+// everything else untouched. Uses inBlock as a simple state machine gate.
 function stripBlock(content: string): string {
   const lines = content.split('\n');
   const result: string[] = [];
@@ -53,8 +55,10 @@ export async function updateExclude(
   }
 
   const entries = threads.map(t => targetDirForThread(t.filePath, gitRoot));
+  // trimEnd ensures no trailing blank lines between existing content and the managed block.
   const stripped = stripBlock(existing).trimEnd();
   const block = buildBlock(entries);
+  // Conditional join avoids a leading newline when the file is new/empty.
   const updated = stripped ? `${stripped}\n${block}` : block;
 
   await writeFile(excludePath, updated, 'utf-8');

@@ -15,6 +15,8 @@ export async function checkDirtyState(dir: string): Promise<DirtyStateResult> {
     return { clean: false, reason: 'uncommitted-changes' };
   }
 
+  // @{u}..HEAD lists commits ahead of the upstream tracking branch.
+  // .catch handles repos with no upstream configured (detached HEAD, no remote).
   const log = await git.log(['@{u}..HEAD']).catch(() => null);
   if (log && log.total > 0) {
     return { clean: false, reason: 'unpushed-commits' };
