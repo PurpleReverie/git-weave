@@ -1,4 +1,4 @@
-import { access } from 'fs/promises';
+import { access, rm } from 'fs/promises';
 import { join, basename } from 'path';
 import { simpleGit } from 'simple-git';
 import { config as loadEnv } from 'dotenv';
@@ -44,8 +44,10 @@ async function syncNestedThreads(targetDir: string, depth: number, rootEnvPath: 
   try {
     const nestedConfig = await parseWeaveConfig(targetDir);
     nestedThreads = await scanThreadFiles(targetDir, nestedConfig);
-  } catch {
-    return; // no .thread files or unreadable — skip silently
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`  warning: could not read nested config in ${targetDir}: ${message}`);
+    return;
   }
 
   if (nestedThreads.length === 0) return;
@@ -71,11 +73,16 @@ export async function syncRepo(resolved: ResolvedThread, depth = 0, rootEnvPath 
     if (!await dirExists(targetDir)) {
       await simpleGit().clone(repoUrl, targetDir);
 
-      if (thread.hash) {
-        await simpleGit(targetDir).checkout(thread.hash);
+      try {
+        if (thread.hash) {
+          await simpleGit(targetDir).checkout(thread.hash);
+        }
+        await syncNestedThreads(targetDir, depth, rootEnvPath);
+      } catch (err) {
+        await rm(targetDir, { recursive: true, force: true });
+        throw err;
       }
 
-      await syncNestedThreads(targetDir, depth, rootEnvPath);
       return { filePath, targetDir, status: 'cloned' };
     }
 
