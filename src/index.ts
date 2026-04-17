@@ -3,6 +3,12 @@ import { config as loadEnv } from 'dotenv';
 import { Command } from 'commander';
 
 loadEnv({ quiet: true }); // load .env from cwd; shell env takes priority (override: false is the default)
+
+const [major] = process.versions.node.split('.').map(Number);
+if (major < 18) {
+  console.error('git-weave requires Node.js 18 or higher.');
+  process.exit(1);
+}
 import { parseWeaveConfig } from './config/parseWeaveConfig.js';
 import { scanThreadFiles } from './config/scanThreadFiles.js';
 import { syncRepo } from './sync/syncRepo.js';
@@ -171,13 +177,6 @@ program
 
     await updateExclude(gitRoot, threads, config);
     console.log(`Updated exclude file with ${threads.length} entr${threads.length === 1 ? 'y' : 'ies'}.`);
-  });
-
-program
-  .command('hello')
-  .description('Hello world test command')
-  .action(() => {
-    console.log('Hello from weave!');
   });
 
 program

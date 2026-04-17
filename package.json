@@ -1,7 +1,7 @@
 {
-  "name": "weave",
+  "name": "git-weave",
   "version": "0.1.0",
-  "description": "Git-aware CLI for managing child repositories",
+  "description": "Git-aware CLI for managing child repositories via .thread files",
   "main": "dist/index.js",
   "bin": {
     "weave": "dist/index.js"
@@ -9,28 +9,34 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
     "dev": "ts-node src/index.ts",
     "prepare": "npm run build"
   },
   "files": [
     "dist"
   ],
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "@eslint/js": "^9.39.4",
-    "@types/node": "^25.5.1",
-    "eslint": "^9.39.4",
-    "ts-node": "^10.9.2",
-    "typescript": "^6.0.2",
-    "typescript-eslint": "^8.58.2"
+  "author": "PurpleReverie",
+  "license": "MIT",
+  "homepage": "https://github.com/PurpleReverie/git-weave#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PurpleReverie/git-weave.git"
   },
+  "bugs": {
+    "url": "https://github.com/PurpleReverie/git-weave/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["git", "repository", "sync", "cli", "devtools", "multi-repo", "submodules"],
   "dependencies": {
-    "commander": "^14.0.3",
-    "dotenv": "^17.4.0",
-    "simple-git": "^3.33.0"
+    "commander": "14.0.3",
+    "dotenv": "17.4.0",
+    "simple-git": "3.33.0"
+  },
+  "devDependencies": {
+    "@types/node": "25.5.1",
+    "ts-node": "10.9.2",
+    "typescript": "6.0.2"
   }
 }
