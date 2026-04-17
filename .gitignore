@@ -1,47 +1,13 @@
-# Build output
-/bin/
-/obj/
-/dist/
-/publish/
-
-# User-specific files
-*.user
-*.suo
-*.userosscache
-*.sln.docstates
-
-# OS-generated files
-.DS_Store
-Thumbs.db
-
-# Rider IDE
-.idea/
-
-# Log files
-*.log
-
-# Dotnet environment files
-.env
-.env.*
-
-# NuGet packages
-*.nupkg
-*.snupkg
-packages/
-
-# Other
-*.db
-*.sqlite
-*.bak
-*.tmp
-
-# Rider & VS for Mac
-*.pidb
-*.userprefs
-*.userprefs.meta
-
 node_modules/
 dist/
+
+.env
+.env.*
 weave.local.json
+
+.DS_Store
+Thumbs.db
+*.log
+
 .testbed/
 .ignored/
