@@ -29,6 +29,9 @@
     "node": ">=18"
   },
   "keywords": ["git", "repository", "sync", "cli", "devtools", "multi-repo", "submodules"],
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "commander": "14.0.3",
     "dotenv": "17.4.0",

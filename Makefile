@@ -2,4 +2,4 @@ link:
 	npm run build && npm link
 
 unlink:
-	npm unlink -g weave
+	npm unlink -g git-weave
