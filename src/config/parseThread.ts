@@ -30,6 +30,8 @@ export async function parseThread(filePath: string): Promise<ThreadFile> {
     throw new Error(`Missing or empty required field "branch" in: ${filePath}`);
   }
 
+  // null is a valid value written by `weave unlock` to clear a pinned hash.
+  // We only reject types that are neither string nor absent/null.
   if (obj.hash !== undefined && obj.hash !== null && typeof obj.hash !== 'string') {
     throw new Error(`Field "hash" must be a string or null in: ${filePath}`);
   }

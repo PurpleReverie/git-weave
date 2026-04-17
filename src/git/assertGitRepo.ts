@@ -19,6 +19,7 @@ export async function assertGitRepo(cwd: string): Promise<string> {
     }
 
     const parent = dirname(current);
+    // dirname('/') === '/' — equality means we've hit the filesystem root
     if (parent === current) {
       throw new Error('weave must be run inside a git repository');
     }
