@@ -1,63 +1,43 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) when working in this repository.
 
 ## What This Is
 
 **Weave** is a CLI tool for managing child git repositories within a parent repo using `.thread` descriptor files — a simpler alternative to git submodules. It handles cloning, syncing, locking to commit hashes, git hook integration, and SSH alias rewrites for multi-account setups.
 
-## Commands
+For the user-facing feature set and command list, see `README.md` and `src/index.ts` (the Commander definitions are the source of truth).
 
-```bash
-npm run build     # Compile TypeScript → dist/
-npm run lint      # ESLint across src/ (typescript-eslint/recommended)
-npm run dev       # Run via ts-node (no compile step, dev only)
-make link         # Build + npm link globally (for local testing as `weave` CLI)
-make unlink       # Remove global weave link
-```
+## Working in this repo
 
-No test runner is configured yet.
-
-To test manually, use the `.testbed/` directory — it has a `weave.json` and sample `.thread` files, and references the local package via `"file:.."`.
+- Build/dev/link scripts: see `package.json` and `Makefile`. Don't restate them here — they'll drift.
+- No test runner is wired up. If you add one, update this section.
 
 ## Architecture
 
-### Entry Point & CLI
+### `.thread` file convention
 
-`src/index.ts` — Commander.js app. Loads `.env` at startup (shell env always wins), then defines 8 commands: `init`, `sync`, `lock`, `unlock`, `check`, `ignore`, `hello`, `debug`. Each command delegates to a handler in `src/sync/` or `src/git/`.
+A `.thread` file lives next to where its child repo should be cloned. `services/api.thread` → clones into `services/api/`. The `alias` field, when set, names an environment variable whose value overrides the `repo` URL — used for SSH multi-account host rewrites.
 
-### Config Layer (`src/config/`)
+### Configuration
 
-Two config files govern behaviour:
-- **`weave.json`** — committed, shared: scan paths, sync strategy (`pinned` | `latest`), hook preferences, exclude method (`git-exclude` | `gitignore`)
-- **`.env`** — gitignored, per-developer: SSH alias env vars
+- **`weave.json`** — committed, shared across the team. Defines scan paths, sync strategy, hook preferences, and exclude method. The schema lives in `src/types.ts`; the parser in `src/config/parseWeaveConfig.ts` applies defaults when fields or the file are absent.
+- **`.env`** — gitignored, per-developer. Holds the values for any env vars referenced by `.thread` `alias` fields.
 
-`parseWeaveConfig.ts` returns sane defaults if `weave.json` is absent. `parseThread.ts` validates `.thread` files (strict: `repo` + `branch` required, `hash` + `alias` optional). `scanThreadFiles.ts` walks scan paths and deduplicates results.
+`.env` is loaded once at CLI startup; shell environment takes precedence.
 
-### `.thread` File Convention
+### Source layout
 
-A `.thread` file lives next to where its child repo should be cloned. `services/api.thread` → clones into `services/api/`. The `alias` field names an env var whose value overrides the `repo` URL (for SSH multi-account rewrites).
+- `src/index.ts` — Commander entry point. Each subcommand is a thin wrapper that delegates to a handler.
+- `src/config/` — parses `weave.json` and `.thread` files, scans for `.thread` files.
+- `src/sync/` — clone/fetch/checkout logic, lock/unlock of pinned hashes, clean-state checks, and alias → URL resolution.
+- `src/git/` — git-repo discovery, dirty-state checks, `.git/info/exclude` / `.gitignore` management, and git-hook installation.
+- `src/types.ts` — shared type definitions for parsed config and resolved threads.
 
-### Sync Layer (`src/sync/`)
+### Git integration
 
-`syncRepo.ts` is the core — it clones if missing, checks dirty state, fetches, then either checks out a pinned `hash` or pulls latest on `branch`. It then recurses into nested `.thread` files (up to 3 levels). `resolveAuth.ts` rewrites URLs via `alias` → env var before any git operation.
+Weave manages a marked block in either `.git/info/exclude` or `.gitignore` (configurable) so that child repo directories don't show up as untracked in the parent. Git hooks are installed with `# managed by weave` markers and appended to existing hook contents idempotently.
 
-`lockThreads.ts` / `unlockThreads.ts` read/write the `hash` field in `.thread` files (equivalent to `package-lock.json` semantics).
+## ESM
 
-`checkRepos.ts` verifies clean state; used by the `pre-push` hook to block pushes if child repos are dirty or unpushed.
-
-### Git Layer (`src/git/`)
-
-`updateExclude.ts` manages a weave-owned block in `.git/info/exclude` or `.gitignore` without touching surrounding content.
-
-`installHooks.ts` appends weave commands to existing git hooks with `# managed by weave` markers for idempotency. Hooks installed: `post-merge` → `weave sync`, `post-checkout` → `weave sync`, `pre-push` → `weave check`.
-
-### Key Types (`src/types.ts`)
-
-- `ThreadFile` — raw parsed `.thread` JSON
-- `WeaveConfig` — parsed `weave.json` with defaults applied
-- `ResolvedThread` — `ThreadFile` with `alias` resolved to a concrete URL, ready for git operations
-
-## ESM Module
-
-The package is pure ESM (`"type": "module"` in package.json, `"module": "ES2022"` in tsconfig). All imports need extensions when working in `dist/`. `ts-node` is configured for ESM via `--esm` flag in the `dev` script.
+The package is pure ESM (`"type": "module"`). Relative imports in `src/` must include the `.js` extension so they resolve in compiled output. `ts-node` runs in ESM mode for development.
