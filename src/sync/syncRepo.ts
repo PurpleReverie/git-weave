@@ -1,5 +1,5 @@
-import { access, rm } from 'fs/promises';
-import { join, basename } from 'path';
+import { access, readdir, rm } from 'fs/promises';
+import { join } from 'path';
 import { simpleGit } from 'simple-git';
 import { config as loadEnv } from 'dotenv';
 import { ResolvedThread } from '../types.js';
@@ -7,6 +7,7 @@ import { resolveRepoUrl } from './resolveAuth.js';
 import { checkDirtyState } from '../git/checkDirtyState.js';
 import { parseWeaveConfig } from '../config/parseWeaveConfig.js';
 import { scanThreadFiles } from '../config/scanThreadFiles.js';
+import { targetDirForThread } from './targetDir.js';
 
 export type SyncStatus = 'cloned' | 'updated' | 'skipped' | 'failed';
 
@@ -19,12 +20,6 @@ export interface SyncResult {
 
 const MAX_DEPTH = 3;
 
-function targetDirForThread(filePath: string): string {
-  const dir = filePath.substring(0, filePath.lastIndexOf('/'));
-  const name = basename(filePath, '.thread');
-  return join(dir, name);
-}
-
 async function dirExists(path: string): Promise<boolean> {
   try {
     await access(path);
@@ -32,6 +27,12 @@ async function dirExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// `.git` can be a directory (normal clone) or a file (worktree/submodule pointer).
+// access() succeeds for both, which is all we need to confirm this is a git repo root.
+async function isGitRepo(path: string): Promise<boolean> {
+  return dirExists(join(path, '.git'));
 }
 
 async function syncNestedThreads(targetDir: string, depth: number, rootEnvPath: string): Promise<void> {
@@ -70,8 +71,28 @@ export async function syncRepo(resolved: ResolvedThread, depth = 0, rootEnvPath 
   const repoUrl = resolveRepoUrl(thread.repo, thread.alias);
 
   try {
+    // If the target dir exists but has no .git, simple-git would walk up and
+    // operate on the *parent* repo — falsely reporting the child as dirty.
+    // Recover automatically when the dir is empty; refuse otherwise so we
+    // don't blow away user data sitting in a placeholder directory.
+    if (await dirExists(targetDir) && !await isGitRepo(targetDir)) {
+      const entries = await readdir(targetDir);
+      if (entries.length > 0) {
+        return {
+          filePath,
+          targetDir,
+          status: 'failed',
+          error: `${targetDir} exists but is not a git repo (contains ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}); remove it and re-run`,
+        };
+      }
+      await rm(targetDir, { recursive: true, force: true });
+    }
+
     if (!await dirExists(targetDir)) {
-      await simpleGit().clone(repoUrl, targetDir);
+      // --branch lands the clone on thread.branch instead of whatever the
+      // remote's default HEAD points at. All refs are still fetched, so a
+      // later checkout(hash) onto a commit on another branch still works.
+      await simpleGit().clone(repoUrl, targetDir, ['--branch', thread.branch]);
 
       try {
         if (thread.hash) {

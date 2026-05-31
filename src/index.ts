@@ -14,6 +14,7 @@ import { scanThreadFiles } from './config/scanThreadFiles.js';
 import { syncRepo } from './sync/syncRepo.js';
 import { assertGitRepo } from './git/assertGitRepo.js';
 import { updateExclude } from './git/updateExclude.js';
+import { findOrphans, cleanOrphans } from './sync/cleanOrphans.js';
 import { lockThread } from './sync/lockThreads.js';
 import { unlockThread } from './sync/unlockThreads.js';
 import { installHooks } from './git/installHooks.js';
@@ -36,7 +37,11 @@ program
     const threads = await scanThreadFiles(cwd, config);
 
     if (threads.length === 0) {
-      console.log('No .thread files found.');
+      const scanned = config.scan.length === 1 && config.scan[0] === '.'
+        ? 'this repository'
+        : `scan paths: ${config.scan.join(', ')}`;
+      console.log(`No .thread files found under ${scanned}.`);
+      console.log('Create one alongside where a child repo should live, e.g. services/api.thread');
       return;
     }
 
@@ -86,7 +91,8 @@ program
 program
   .command('lock')
   .description('Pin all child repos to their current HEAD hash')
-  .action(async () => {
+  .option('--force', 'Pin even if HEAD is not yet pushed to a remote branch')
+  .action(async (opts: { force?: boolean }) => {
     const cwd = process.cwd();
     const config = await parseWeaveConfig(cwd);
     const threads = await scanThreadFiles(cwd, config);
@@ -99,7 +105,7 @@ program
     for (const resolved of threads) {
       process.stdout.write(`  ${resolved.filePath} ... `);
       try {
-        const hash = await lockThread(resolved);
+        const hash = await lockThread(resolved, { force: !!opts.force });
         console.log(hash.slice(0, 7));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -177,6 +183,47 @@ program
 
     await updateExclude(gitRoot, threads, config);
     console.log(`Updated exclude file with ${threads.length} entr${threads.length === 1 ? 'y' : 'ies'}.`);
+  });
+
+program
+  .command('clean')
+  .description('Remove cloned child directories whose .thread file no longer exists')
+  .option('--apply', 'Actually remove orphans (default is a dry run)')
+  .option('--force', 'Remove orphans even if dirty, unpushed, or non-git; implies --apply')
+  .action(async (opts: { apply?: boolean; force?: boolean }) => {
+    const cwd = process.cwd();
+    const gitRoot = await assertGitRepo(cwd);
+    const config = await parseWeaveConfig(cwd);
+    const threads = await scanThreadFiles(cwd, config);
+
+    const orphans = await findOrphans(gitRoot, config, threads);
+    if (orphans.length === 0) {
+      console.log('No orphans found.');
+      return;
+    }
+
+    const apply = !!(opts.apply || opts.force);
+    if (!apply) {
+      console.log(`Found ${orphans.length} orphan${orphans.length === 1 ? '' : 's'} (dry run — re-run with --apply to remove):`);
+    }
+
+    const result = await cleanOrphans(orphans, { apply, force: !!opts.force });
+
+    for (const orphan of orphans) {
+      const removed = result.removed.includes(orphan.path);
+      const skip = result.skipped.find(s => s.path === orphan.path);
+      const detail = orphan.detail ? ` (${orphan.detail})` : '';
+      let action: string;
+      if (removed) action = apply ? 'removed' : 'would remove';
+      else if (skip) action = `skipped — ${skip.reason}`;
+      else action = 'unchanged';
+      console.log(`  ${orphan.path} — ${orphan.status}${detail} → ${action}`);
+    }
+
+    if (apply && result.removed.length > 0) {
+      // Rebuild the exclude block so stale entries are dropped together with the dirs.
+      await updateExclude(gitRoot, threads, config);
+    }
   });
 
 program

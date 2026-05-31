@@ -4,9 +4,13 @@ import { WeaveConfig } from '../types.js';
 
 const WEAVE_MARKER = '# managed by weave';
 
+// Git passes three args to post-checkout: prev-HEAD, new-HEAD, flag.
+// flag == 1 → branch/ref checkout; flag == 0 → file-level checkout.
+// We only want to resync on a branch checkout, otherwise `git checkout file.txt`
+// would also trigger a full weave sync.
 const HOOK_LINE: Record<string, string> = {
   'post-merge': `npx weave sync  ${WEAVE_MARKER}`,
-  'post-checkout': `npx weave sync  ${WEAVE_MARKER}`,
+  'post-checkout': `if [ "$3" = "1" ]; then npx weave sync; fi  ${WEAVE_MARKER}`,
   'pre-push': `npx weave check  ${WEAVE_MARKER}`,
 };
 
