@@ -1,7 +1,8 @@
 import { simpleGit } from 'simple-git';
 import { access } from 'fs/promises';
-import { join, basename } from 'path';
+import { join } from 'path';
 import { ResolvedThread } from '../types.js';
+import { targetDirForThread } from './targetDir.js';
 
 export type CheckStatus = 'ok' | 'missing' | 'uncommitted-changes' | 'unpushed-commits' | 'wrong-hash';
 
@@ -21,18 +22,17 @@ async function dirExists(path: string): Promise<boolean> {
   }
 }
 
-function targetDirForThread(filePath: string): string {
-  const dir = filePath.substring(0, filePath.lastIndexOf('/'));
-  const name = basename(filePath, '.thread');
-  return join(dir, name);
-}
-
 export async function checkRepo(resolved: ResolvedThread): Promise<CheckResult> {
   const { filePath, thread } = resolved;
   const targetDir = targetDirForThread(filePath);
 
   if (!await dirExists(targetDir)) {
     return { filePath, targetDir, status: 'missing', detail: 'directory not found — run weave sync' };
+  }
+
+  // Without this guard, simple-git would walk up and run against the parent repo.
+  if (!await dirExists(join(targetDir, '.git'))) {
+    return { filePath, targetDir, status: 'missing', detail: 'directory exists but is not a git repo — run weave sync' };
   }
 
   const git = simpleGit(targetDir);

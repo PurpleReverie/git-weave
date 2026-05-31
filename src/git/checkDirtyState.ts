@@ -1,6 +1,8 @@
 import { simpleGit } from 'simple-git';
+import { access } from 'fs/promises';
+import { join } from 'path';
 
-export type DirtyReason = 'uncommitted-changes' | 'unpushed-commits';
+export type DirtyReason = 'uncommitted-changes' | 'unpushed-commits' | 'not-a-git-repo';
 
 export interface DirtyStateResult {
   clean: boolean;
@@ -8,6 +10,14 @@ export interface DirtyStateResult {
 }
 
 export async function checkDirtyState(dir: string): Promise<DirtyStateResult> {
+  // Without this guard, simple-git would walk up to the parent repo's .git
+  // and report the parent's status against the child — a misleading false positive.
+  try {
+    await access(join(dir, '.git'));
+  } catch {
+    return { clean: false, reason: 'not-a-git-repo' };
+  }
+
   const git = simpleGit(dir);
 
   const status = await git.status();
