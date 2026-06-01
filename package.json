@@ -1,6 +1,6 @@
 {
   "name": "git-weave",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Git-aware CLI for managing child repositories via .thread files",
   "main": "dist/index.js",
   "bin": {
