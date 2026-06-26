@@ -2,7 +2,7 @@ import { access, readdir, rm } from 'fs/promises';
 import { join } from 'path';
 import { simpleGit } from 'simple-git';
 import { config as loadEnv } from 'dotenv';
-import { ResolvedThread } from '../types.js';
+import { ResolvedThread, WeaveConfig } from '../types.js';
 import { resolveRepoUrl } from './resolveAuth.js';
 import { checkDirtyState } from '../git/checkDirtyState.js';
 import { parseWeaveConfig } from '../config/parseWeaveConfig.js';
@@ -41,9 +41,10 @@ async function syncNestedThreads(targetDir: string, depth: number, rootEnvPath: 
   // Always re-apply the root .env so nested repos can resolve aliases
   loadEnv({ path: rootEnvPath, quiet: true, override: false });
 
+  let nestedConfig: WeaveConfig;
   let nestedThreads;
   try {
-    const nestedConfig = await parseWeaveConfig(targetDir);
+    nestedConfig = await parseWeaveConfig(targetDir);
     nestedThreads = await scanThreadFiles(targetDir, nestedConfig);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -56,7 +57,7 @@ async function syncNestedThreads(targetDir: string, depth: number, rootEnvPath: 
   const indent = '  '.repeat(depth + 1);
   for (const nested of nestedThreads) {
     process.stdout.write(`${indent}${nested.thread.repo} ... `);
-    const result = await syncRepo(nested, depth + 1, rootEnvPath);
+    const result = await syncRepo(nested, nestedConfig, depth + 1, rootEnvPath);
     if (result.status === 'failed' || result.status === 'skipped') {
       console.log(`${result.status}\n${indent}  ${result.error}`);
     } else {
@@ -65,7 +66,7 @@ async function syncNestedThreads(targetDir: string, depth: number, rootEnvPath: 
   }
 }
 
-export async function syncRepo(resolved: ResolvedThread, depth = 0, rootEnvPath = join(process.cwd(), '.env')): Promise<SyncResult> {
+export async function syncRepo(resolved: ResolvedThread, config: WeaveConfig, depth = 0, rootEnvPath = join(process.cwd(), '.env')): Promise<SyncResult> {
   const { filePath, thread } = resolved;
   const targetDir = targetDirForThread(filePath);
   const repoUrl = resolveRepoUrl(thread.repo, thread.alias);
@@ -120,6 +121,18 @@ export async function syncRepo(resolved: ResolvedThread, depth = 0, rootEnvPath 
     if (thread.hash) {
       await git.checkout(thread.hash);
     } else {
+      // --abbrev-ref HEAD is the current branch name, or "HEAD" when detached.
+      const currentBranch = (await git.revparse(['--abbrev-ref', 'HEAD'])).trim();
+      if (config.ignoreBranchDivergence && currentBranch !== 'HEAD' && currentBranch !== thread.branch) {
+        // Leave the developer on the branch they checked out instead of forcing
+        // them back onto thread.branch. Skip nested sync too — the tree is theirs.
+        return {
+          filePath,
+          targetDir,
+          status: 'skipped',
+          error: `on branch ${currentBranch} (declared ${thread.branch}); left as-is — ignoreBranchDivergence is set`,
+        };
+      }
       await git.checkout(thread.branch);
       await git.pull();
     }

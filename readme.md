@@ -157,6 +157,7 @@ npx weave sync
 - Repos that don't exist locally are cloned
 - Existing repos are fetched then checked out to the pinned hash or latest branch
 - Repos with uncommitted changes or commits not yet pushed are skipped with a warning
+- With `ignoreBranchDivergence` set, a latest-tracking repo sitting on a different branch is left as-is instead of being switched back to its declared branch
 - Recursively follows `.thread` files found inside child repos (up to 3 levels deep)
 - Reports per-repo status: `cloned`, `updated`, `skipped`, or `failed`
 
@@ -187,7 +188,7 @@ Verify all child repos are clean and at the expected hash or branch HEAD. Exits 
 npx weave check
 ```
 
-Runs automatically as a `pre-push` hook to block pushes when child repos are out of sync.
+Runs automatically as a `pre-push` hook to block pushes when child repos are out of sync. Set `allowDirty: true` in `weave.json` if you want local changes in a child repo to not block the parent push while you work.
 
 ### `weave ignore`
 
@@ -210,6 +211,8 @@ Useful if you add new `.thread` files and want to update exclusions without a fu
   "version": 1,
   "scan": ["."],
   "syncStrategy": "pinned",
+  "ignoreBranchDivergence": false,
+  "allowDirty": false,
   "hooks": {
     "postMerge": true,
     "postCheckout": true,
@@ -224,6 +227,8 @@ Useful if you add new `.thread` files and want to update exclusions without a fu
 | `version` | `1` | Config schema version |
 | `scan` | `["."]` | Directories to scan for `.thread` files, relative to repo root |
 | `syncStrategy` | `"pinned"` | `"pinned"` — respect the `hash` field; `"latest"` — always pull branch HEAD regardless of `hash` |
+| `ignoreBranchDivergence` | `false` | When `true`, a child repo checked out on a branch other than its `.thread` `branch` is left alone: `weave check` won't flag it and `weave sync` won't force it back onto the declared branch. Applies to latest-tracking repos (no `hash`); pinned repos are still verified against their exact commit |
+| `allowDirty` | `false` | When `true`, uncommitted changes or unpushed commits in a child repo won't fail `weave check`, so the `pre-push` hook won't block a parent push while you're mid-change. Only relaxes things when a child is actually dirty — a clean checkout (e.g. CI) is still fully verified. `weave sync` still skips dirty repos regardless, to avoid overwriting local work |
 | `hooks.postMerge` | `true` | Install a `post-merge` hook that auto-runs `weave sync` after `git pull` |
 | `hooks.postCheckout` | `true` | Install a `post-checkout` hook that auto-runs `weave sync` after `git checkout` |
 | `hooks.prePush` | `true` | Install a `pre-push` hook that blocks pushes if any child repo is dirty or out of sync |

@@ -6,6 +6,8 @@ const DEFAULTS: WeaveConfig = {
   version: 1,
   scan: ['.'],
   syncStrategy: 'pinned',
+  ignoreBranchDivergence: false,
+  allowDirty: false,
   hooks: {
     postMerge: true,
     postCheckout: true,
@@ -50,6 +52,14 @@ export async function parseWeaveConfig(cwd: string): Promise<WeaveConfig> {
     throw new Error(`weave.json: "exclude" must be "git-info" or "gitignore"`);
   }
 
+  if (obj.ignoreBranchDivergence !== undefined && typeof obj.ignoreBranchDivergence !== 'boolean') {
+    throw new Error(`weave.json: "ignoreBranchDivergence" must be a boolean`);
+  }
+
+  if (obj.allowDirty !== undefined && typeof obj.allowDirty !== 'boolean') {
+    throw new Error(`weave.json: "allowDirty" must be a boolean`);
+  }
+
   const hooks = typeof obj.hooks === 'object' && obj.hooks !== null
     ? obj.hooks as Record<string, unknown>
     : {};
@@ -58,6 +68,8 @@ export async function parseWeaveConfig(cwd: string): Promise<WeaveConfig> {
     version: typeof obj.version === 'number' ? obj.version : DEFAULTS.version,
     scan: Array.isArray(obj.scan) ? obj.scan as string[] : DEFAULTS.scan,
     syncStrategy: (obj.syncStrategy as WeaveConfig['syncStrategy']) ?? DEFAULTS.syncStrategy,
+    ignoreBranchDivergence: typeof obj.ignoreBranchDivergence === 'boolean' ? obj.ignoreBranchDivergence : DEFAULTS.ignoreBranchDivergence,
+    allowDirty: typeof obj.allowDirty === 'boolean' ? obj.allowDirty : DEFAULTS.allowDirty,
     hooks: {
       postMerge: typeof hooks.postMerge === 'boolean' ? hooks.postMerge : DEFAULTS.hooks.postMerge,
       postCheckout: typeof hooks.postCheckout === 'boolean' ? hooks.postCheckout : DEFAULTS.hooks.postCheckout,

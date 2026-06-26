@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import { config as loadEnv } from 'dotenv';
 import { Command } from 'commander';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
 loadEnv({ quiet: true }); // load .env from cwd; shell env takes priority (override: false is the default)
 
@@ -20,12 +23,17 @@ import { unlockThread } from './sync/unlockThreads.js';
 import { installHooks } from './git/installHooks.js';
 import { checkRepos } from './sync/checkRepos.js';
 
+// Read version from package.json so `weave --version` always matches the
+// published package — one place to bump on release instead of two.
+const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
+const { version } = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string };
+
 const program = new Command();
 
 program
   .name('weave')
   .description('Git-aware CLI for managing child repositories')
-  .version('0.2.0');
+  .version(version);
 
 program
   .command('init')
@@ -54,7 +62,7 @@ program
     console.log('Syncing child repos...');
     for (const resolved of threads) {
       process.stdout.write(`  ${resolved.thread.repo} ... `);
-      const result = await syncRepo(resolved);
+      const result = await syncRepo(resolved, config);
       if (result.status === 'failed' || result.status === 'skipped') {
         console.log(`${result.status}\n    ${result.error}`);
       } else {
@@ -78,7 +86,7 @@ program
 
     for (const resolved of threads) {
       process.stdout.write(`  ${resolved.thread.repo} ... `);
-      const result = await syncRepo(resolved);
+      const result = await syncRepo(resolved, config);
 
       if (result.status === 'failed' || result.status === 'skipped') {
         console.log(`${result.status}\n    ${result.error}`);
@@ -155,7 +163,7 @@ program
       return;
     }
 
-    const results = await checkRepos(threads);
+    const results = await checkRepos(threads, config);
     let failed = false;
 
     for (const result of results) {

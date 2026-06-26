@@ -1,10 +1,10 @@
 import { simpleGit } from 'simple-git';
 import { access } from 'fs/promises';
 import { join } from 'path';
-import { ResolvedThread } from '../types.js';
+import { ResolvedThread, WeaveConfig } from '../types.js';
 import { targetDirForThread } from './targetDir.js';
 
-export type CheckStatus = 'ok' | 'missing' | 'uncommitted-changes' | 'unpushed-commits' | 'wrong-hash';
+export type CheckStatus = 'ok' | 'missing' | 'uncommitted-changes' | 'unpushed-commits' | 'wrong-hash' | 'branch-diverged';
 
 export interface CheckResult {
   filePath: string;
@@ -22,7 +22,7 @@ async function dirExists(path: string): Promise<boolean> {
   }
 }
 
-export async function checkRepo(resolved: ResolvedThread): Promise<CheckResult> {
+export async function checkRepo(resolved: ResolvedThread, config: WeaveConfig): Promise<CheckResult> {
   const { filePath, thread } = resolved;
   const targetDir = targetDirForThread(filePath);
 
@@ -37,8 +37,16 @@ export async function checkRepo(resolved: ResolvedThread): Promise<CheckResult> 
 
   const git = simpleGit(targetDir);
 
+  // With allowDirty set, local work in a child (uncommitted changes or unpushed
+  // commits) is treated as in-sync so the pre-push hook won't block. We return
+  // early — once a repo is being actively worked on, hash/branch policing would
+  // only get in the way. A clean checkout (e.g. CI) skips this and is verified
+  // normally, so the relaxation only ever applies while you're mid-change.
   const status = await git.status();
   if (!status.isClean()) {
+    if (config.allowDirty) {
+      return { filePath, targetDir, status: 'ok' };
+    }
     return { filePath, targetDir, status: 'uncommitted-changes', detail: 'child repo has uncommitted changes' };
   }
 
@@ -46,6 +54,9 @@ export async function checkRepo(resolved: ResolvedThread): Promise<CheckResult> 
   // .catch handles repos with no upstream configured (detached HEAD, no remote).
   const log = await git.log(['@{u}..HEAD']).catch(() => null);
   if (log && log.total > 0) {
+    if (config.allowDirty) {
+      return { filePath, targetDir, status: 'ok' };
+    }
     return { filePath, targetDir, status: 'unpushed-commits', detail: `child repo has ${log.total} unpushed commit(s)` };
   }
 
@@ -64,6 +75,22 @@ export async function checkRepo(resolved: ResolvedThread): Promise<CheckResult> 
       };
     }
   } else {
+    // status.current is the checked-out branch name (null when detached HEAD).
+    const currentBranch = status.current;
+    if (currentBranch && currentBranch !== thread.branch) {
+      if (config.ignoreBranchDivergence) {
+        // Developer is intentionally on another branch; it's clean and pushed,
+        // so honour the config and treat it as in-sync.
+        return { filePath, targetDir, status: 'ok' };
+      }
+      return {
+        filePath,
+        targetDir,
+        status: 'branch-diverged',
+        detail: `on branch ${currentBranch}, expected ${thread.branch} — run weave sync or set ignoreBranchDivergence in weave.json`,
+      };
+    }
+
     // Fetch first so origin/<branch> reflects the actual remote tip before comparing.
     await git.fetch();
     const remoteHash = (await git.revparse([`origin/${thread.branch}`])).trim();
@@ -80,10 +107,10 @@ export async function checkRepo(resolved: ResolvedThread): Promise<CheckResult> 
   return { filePath, targetDir, status: 'ok' };
 }
 
-export async function checkRepos(threads: ResolvedThread[]): Promise<CheckResult[]> {
+export async function checkRepos(threads: ResolvedThread[], config: WeaveConfig): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
   for (const resolved of threads) {
-    results.push(await checkRepo(resolved));
+    results.push(await checkRepo(resolved, config));
   }
   return results;
 }
